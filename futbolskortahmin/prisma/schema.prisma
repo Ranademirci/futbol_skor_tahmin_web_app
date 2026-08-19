@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  firstName    String
+  lastName     String
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  predictions  Prediction[]
+  scores       UserScore[]
+}
+
+model Team {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  shortName       String
+  logoUrl         String    @default("")
+  isBigFour       Boolean   @default(false)
+  apiFootballId   Int       @unique
+  homeMatches     Match[]   @relation("HomeTeam")
+  awayMatches     Match[]   @relation("AwayTeam")
+  players         Player[]
+  matchGoals      MatchGoal[]
+  matchAssists    MatchAssist[]
+  predGoals       PredictionGoalScorer[]
+  predAssists     PredictionAssist[]
+}
+
+model Player {
+  id              String    @id @default(cuid())
+  name            String
+  position        String    @default("")
+  teamId          String
+  team            Team      @relation(fields: [teamId], references: [id])
+  apiFootballId   Int       @unique
+  matchGoals      MatchGoal[]
+  matchAssists    MatchAssist[]
+  predGoals       PredictionGoalScorer[]
+  predAssists     PredictionAssist[]
+  motmMatches     Match[]   @relation("MOTM")
+  motmPredictions Prediction[] @relation("MOTMPrediction")
+}
+
+model Match {
+  id              String      @id @default(cuid())
+  season          String
+  week            Int
+  homeTeamId      String
+  homeTeam        Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId      String
+  awayTeam        Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  kickoffTime     DateTime
+  homeScore       Int?
+  awayScore       Int?
+  isDerby         Boolean     @default(false)
+  status          String      @default("SCHEDULED") // SCHEDULED, LIVE, FINISHED, POSTPONED, CANCELLED
+  motmPlayerId    String?
+  motmPlayer      Player?     @relation("MOTM", fields: [motmPlayerId], references: [id])
+  apiFixtureId    Int         @unique
+  goals           MatchGoal[]
+  assists         MatchAssist[]
+  predictions     Prediction[]
+  scores          UserScore[]
+}
+
+model MatchGoal {
+  id        String @id @default(cuid())
+  matchId   String
+  match     Match  @relation(fields: [matchId], references: [id])
+  playerId  String
+  player    Player @relation(fields: [playerId], references: [id])
+  teamId    String
+  team      Team   @relation(fields: [teamId], references: [id])
+  count     Int    @default(1)
+}
+
+model MatchAssist {
+  id         String  @id @default(cuid())
+  matchId    String
+  match      Match   @relation(fields: [matchId], references: [id])
+  playerId   String?
+  player     Player? @relation(fields: [playerId], references: [id])
+  teamId     String
+  team       Team    @relation(fields: [teamId], references: [id])
+  count      Int     @default(1)
+  isSetPiece Boolean @default(false)
+}
+
+model Prediction {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  matchId        String
+  match          Match     @relation(fields: [matchId], references: [id])
+  homeScorePred  Int
+  awayScorePred  Int
+  motmPlayerId   String?
+  motmPlayer     Player?   @relation("MOTMPrediction", fields: [motmPlayerId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  goalScorers    PredictionGoalScorer[]
+  assists        PredictionAssist[]
+  score          UserScore?
+
+  @@unique([userId, matchId])
+}
+
+model PredictionGoalScorer {
+  id            String     @id @default(cuid())
+  predictionId  String
+  prediction    Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  playerId      String
+  player        Player     @relation(fields: [playerId], references: [id])
+  teamId        String
+  team          Team       @relation(fields: [teamId], references: [id])
+  count         Int        @default(1)
+}
+
+model PredictionAssist {
+  id            String     @id @default(cuid())
+  predictionId  String
+  prediction    Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+  playerId      String?
+  player        Player?    @relation(fields: [playerId], references: [id])
+  teamId        String
+  team          Team       @relation(fields: [teamId], references: [id])
+  count         Int        @default(1)
+  isSetPiece    Boolean    @default(false)
+}
+
+model UserScore {
+  id                      String     @id @default(cuid())
+  userId                  String
+  user                    User       @relation(fields: [userId], references: [id])
+  matchId                 String
+  match                   Match      @relation(fields: [matchId], references: [id])
+  predictionId            String     @unique
+  prediction              Prediction @relation(fields: [predictionId], references: [id])
+  scorePoints             Int        @default(0)
+  goalPoints              Int        @default(0)
+  assistPoints            Int        @default(0)
+  motmPoints              Int        @default(0)
+  scoreBonusApplied       Boolean    @default(false)
+  derbyMultiplierApplied  Boolean    @default(false)
+  totalPoints             Int        @default(0)
+  calculatedAt            DateTime   @default(now())
+
+  @@unique([userId, matchId])
+}
